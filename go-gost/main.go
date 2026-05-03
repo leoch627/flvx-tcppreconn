@@ -114,7 +114,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("✅ 配置加载成功 - addr: %s\n", config.Addr)
+	addrs := config.Addresses()
+	primaryAddr := addrs[0]
+	fmt.Printf("✅ 配置加载成功 - addrs: %v\n", addrs)
 
 	log := xlogger.NewLogger()
 	logger.SetDefault(log)
@@ -127,9 +129,15 @@ func main() {
 
 	distro := socket.DetectDistro()
 	fullVersion := fmt.Sprintf("%s (%s/%s)", version, distro, runtime.GOARCH)
-	wsReporter := socket.StartWebSocketReporterWithConfig(config.Addr, config.Secret, config.Http, config.Tls, config.Socks, fullVersion)
+
+	var wsReporter interface{ Stop() }
+	if len(addrs) > 1 {
+		wsReporter = socket.StartMultiReporter(addrs, config.Secret, config.Http, config.Tls, config.Socks, fullVersion)
+	} else {
+		wsReporter = socket.StartWebSocketReporterWithConfig(primaryAddr, config.Secret, config.Http, config.Tls, config.Socks, fullVersion)
+	}
 	defer wsReporter.Stop()
-	service.SetHTTPReportURL(config.Addr, config.Secret)
+	service.SetHTTPReportURL(primaryAddr, config.Secret)
 
 	p := &program{}
 	if err := svc.Run(p); err != nil {

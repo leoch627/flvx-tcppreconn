@@ -185,13 +185,9 @@ configure_docker_ipv6() {
   fi
 }
 
-# 选择 docker-compose 文件（根据 IPv6 支持）
-select_compose_file() {
-  if check_ipv6_support > /dev/null 2>&1; then
-    echo "docker-compose-v6.yml"
-  else
-    echo "docker-compose-v4.yml"
-  fi
+# 获取 docker-compose 文件（仅双栈版本）
+get_compose_file() {
+  echo "docker-compose-v6.yml"
 }
 
 # 显示菜单
@@ -433,7 +429,7 @@ purge_existing_installation() {
   # 通过 compose down 清理（不删 volume，删旧镜像）
   if [[ -n "$working_dir" ]]; then
     # 尝试多种常见 compose 文件名
-    for cf in "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml"; do
+    for cf in "docker-compose.yml" "docker-compose-v6.yml"; do
       if [[ -f "${working_dir}/${cf}" ]]; then
         echo "📂 清理旧版 compose 项目 (${working_dir}/${cf})..."
         (cd "$working_dir" && $DOCKER_CMD -f "$cf" down --rmi all --remove-orphans 2>/dev/null) || true
@@ -626,7 +622,7 @@ install_panel() {
   clone_or_pull_repo
 
   # 选择 compose 文件
-  COMPOSE_FILE=$(select_compose_file)
+  COMPOSE_FILE=$(get_compose_file)
   echo "📡 选择配置文件：$COMPOSE_FILE"
 
   # 自动检测并配置 IPv6 支持
@@ -695,7 +691,7 @@ update_panel() {
   echo "📥 拉取最新代码..."
   clone_or_pull_repo
 
-  COMPOSE_FILE=$(select_compose_file)
+  COMPOSE_FILE=$(get_compose_file)
   echo "📡 选择配置文件：$COMPOSE_FILE"
 
   # 自动检测并配置 IPv6 支持
@@ -755,7 +751,7 @@ migrate_to_postgres() {
     return 1
   fi
 
-  COMPOSE_FILE=$(select_compose_file)
+  COMPOSE_FILE=$(get_compose_file)
 
   current_db_type=$(get_current_db_type)
   if [[ "$current_db_type" == "postgres" ]]; then
@@ -832,7 +828,7 @@ uninstall_panel() {
 
   if [[ -d "$PANEL_DIR" ]]; then
     cd "$PANEL_DIR"
-    COMPOSE_FILE=$(select_compose_file)
+    COMPOSE_FILE=$(get_compose_file)
     echo "🛑 停止并删除容器、镜像、卷..."
     $DOCKER_CMD -f "$COMPOSE_FILE" down --rmi all --volumes --remove-orphans 2>/dev/null || true
   fi

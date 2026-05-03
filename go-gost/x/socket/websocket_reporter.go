@@ -1563,23 +1563,18 @@ func (w *WebSocketReporter) handleRollbackAgent(data interface{}) error {
 func updateLocalConfigJSON(httpVal int, tlsVal int, socksVal int) error {
 	path := "config.json"
 
-	// 读取现有配置
-	type LocalConfig struct {
-		Addr   string `json:"addr"`
-		Secret string `json:"secret"`
-		Http   int    `json:"http"`
-		Tls    int    `json:"tls"`
-		Socks  int    `json:"socks"`
-	}
-
-	var cfg LocalConfig
+	// 读取现有配置（使用 map 保留 addrs 等非托管字段）
+	var cfg map[string]interface{}
 	if b, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(b, &cfg)
 	}
+	if cfg == nil {
+		cfg = make(map[string]interface{})
+	}
 
-	cfg.Http = httpVal
-	cfg.Tls = tlsVal
-	cfg.Socks = socksVal
+	cfg["http"] = httpVal
+	cfg["tls"] = tlsVal
+	cfg["socks"] = socksVal
 
 	// 写回
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -1815,6 +1810,28 @@ func StartWebSocketReporterWithConfig(addr string, secret string, http int, tls 
 	reporter.version = version
 	reporter.Start()
 	return reporter
+}
+
+// MultiReporter manages multiple WebSocketReporter instances, one per panel backend.
+type MultiReporter struct {
+	reporters []*WebSocketReporter
+}
+
+// StartMultiReporter creates and starts a WebSocketReporter for each panel address.
+func StartMultiReporter(addrs []string, secret string, http int, tls int, socks int, version string) *MultiReporter {
+	mr := &MultiReporter{}
+	for _, addr := range addrs {
+		r := StartWebSocketReporterWithConfig(addr, secret, http, tls, socks, version)
+		mr.reporters = append(mr.reporters, r)
+	}
+	return mr
+}
+
+// Stop stops all managed reporters.
+func (mr *MultiReporter) Stop() {
+	for _, r := range mr.reporters {
+		r.Stop()
+	}
 }
 
 // handleTcpPing 处理TCP ping诊断命令
