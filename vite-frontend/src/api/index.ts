@@ -5,6 +5,7 @@ import type {
   GroupPermissionApiItem,
   NodeReleaseApiItem,
   NodeApiItem,
+  NodeInstanceItem,
   SpeedLimitApiItem,
   TunnelBatchDeletePreviewApiData,
   TunnelBatchDeleteWithForwardsApiData,
@@ -125,6 +126,8 @@ export const getNodeReleases = (channel: ReleaseChannel = "stable") =>
   Network.post<NodeReleaseApiItem[]>("/node/releases", { channel });
 export const rollbackNode = (id: number) =>
   Network.post("/node/rollback", { id });
+export const getNodeInstances = (id: number) =>
+  Network.post<NodeInstanceItem[]>("/node/instances", { id });
 
 // 隧道CRUD操作 - 全部使用POST请求
 export const createTunnel = (data: TunnelMutationPayload) =>

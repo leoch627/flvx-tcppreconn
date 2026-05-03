@@ -475,6 +475,39 @@ func (h *Handler) nodeInstall(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, response.OK(cmd))
 }
 
+// nodeInstances returns the list of currently connected machine instances for a node,
+// including each instance's remote IP. This can be used to configure DNS A-records
+// for DNS round-robin load balancing across multiple CDT machines sharing the same config.
+func (h *Handler) nodeInstances(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.WriteJSON(w, response.ErrDefault("请求失败"))
+		return
+	}
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if err := decodeJSON(r.Body, &req); err != nil {
+		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
+		return
+	}
+	if req.ID <= 0 {
+		response.WriteJSON(w, response.ErrDefault("节点ID不能为空"))
+		return
+	}
+	if h.wsServer == nil {
+		response.WriteJSON(w, response.OK([]interface{}{}))
+		return
+	}
+	instances := h.wsServer.GetNodeInstances(req.ID)
+	result := make([]map[string]interface{}, 0, len(instances))
+	for _, inst := range instances {
+		result = append(result, map[string]interface{}{
+			"remoteIP": inst.RemoteIP,
+		})
+	}
+	response.WriteJSON(w, response.OK(result))
+}
+
 func (h *Handler) nodeUpdateOrder(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.WriteJSON(w, response.ErrDefault("请求失败"))

@@ -62,8 +62,10 @@ import {
   rollbackNode,
   getPeerRemoteUsageList,
   dismissNodeExpiryReminder,
+  getNodeInstances,
   type ReleaseChannel,
 } from "@/api";
+import type { NodeInstanceItem } from "@/api/types";
 import { PageEmptyState, PageLoadingState } from "@/components/page-state";
 import {
   getConnectionStatusMeta,
@@ -112,6 +114,7 @@ interface Node {
   remoteUrl?: string;
   syncError?: string;
   connectionStatus: "online" | "offline";
+  instanceCount?: number; // number of connected CDT machine instances
   systemInfo?: NodeSystemInfo | null;
   copyLoading?: boolean;
   upgradeLoading?: boolean;
@@ -528,7 +531,7 @@ export default function NodePage() {
 
   // 处理WebSocket消息
   const handleWebSocketMessage = (data: any) => {
-    const { id, type, data: messageData } = data;
+    const { id, type, data: messageData, instanceCount } = data;
     const nodeId = Number(id);
 
     if (Number.isNaN(nodeId)) return;
@@ -539,13 +542,21 @@ export default function NodePage() {
         setNodeList((prev) =>
           prev.map((node) => {
             if (node.id !== nodeId) return node;
-            if (node.connectionStatus === "online") return node;
-
-            return { ...node, connectionStatus: "online" };
+            return {
+              ...node,
+              connectionStatus: "online",
+              instanceCount: typeof instanceCount === "number" ? instanceCount : node.instanceCount,
+            };
           }),
         );
       } else {
         // 离线事件做延迟处理，避免短抖动导致频繁闪烁
+        setNodeList((prev) =>
+          prev.map((node) => {
+            if (node.id !== nodeId) return node;
+            return { ...node, instanceCount: 0 };
+          }),
+        );
         scheduleNodeOffline(nodeId);
       }
     } else if (type === "info") {

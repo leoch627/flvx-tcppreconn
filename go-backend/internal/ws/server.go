@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,10 +37,16 @@ type connWrap struct {
 }
 
 type nodeSession struct {
-	nodeID int64
-	secret string
-	conn   *connWrap
-	crypto *security.AESCrypto // 缓存的 AES 加密器，避免每条消息重建
+	nodeID   int64
+	secret   string
+	conn     *connWrap
+	crypto   *security.AESCrypto // 缓存的 AES 加密器，避免每条消息重建
+	remoteIP string              // 该实例的来源 IP（用于 DNS 负载均衡展示）
+}
+
+// NodeInstanceInfo holds information about a single connected machine for a node.
+type NodeInstanceInfo struct {
+	RemoteIP string `json:"remoteIP"`
 }
 
 type commandResponse struct {
@@ -77,7 +84,7 @@ type Server struct {
 
 	mu      sync.RWMutex
 	admins  map[*connWrap]struct{}
-	nodes   map[int64]*nodeSession
+	nodes   map[int64][]*nodeSession // multiple instances per node
 	byConn  map[*websocket.Conn]*nodeSession
 	pending map[string]pendingRequest
 }
@@ -124,7 +131,7 @@ func NewServer(repo *repo.Repository, jwtSecret string) *Server {
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 		admins:  make(map[*connWrap]struct{}),
-		nodes:   make(map[int64]*nodeSession),
+		nodes:   make(map[int64][]*nodeSession),
 		byConn:  make(map[*websocket.Conn]*nodeSession),
 		pending: make(map[string]pendingRequest),
 	}
@@ -207,46 +214,64 @@ func (s *Server) handleNode(w http.ResponseWriter, r *http.Request, nodeID int64
 	tlsVal := parseIntDefault(r.URL.Query().Get("tls"), 0)
 	socksVal := parseIntDefault(r.URL.Query().Get("socks"), 0)
 
-	s.mu.Lock()
-	if old, ok := s.nodes[nodeID]; ok {
-		_ = old.conn.conn.Close()
-		delete(s.byConn, old.conn.conn)
+	// Extract remote IP for DNS load-balancing display.
+	remoteIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if remoteIP == "" {
+		remoteIP = r.RemoteAddr
 	}
+
 	// 初始化 AES 加密器并缓存（仅创建一次）
 	var nodeCrypto *security.AESCrypto
 	if strings.TrimSpace(secret) != "" {
 		nodeCrypto, _ = security.NewAESCrypto(secret)
 	}
-	ns := &nodeSession{nodeID: nodeID, secret: secret, conn: cw, crypto: nodeCrypto}
-	s.nodes[nodeID] = ns
+	ns := &nodeSession{nodeID: nodeID, secret: secret, conn: cw, crypto: nodeCrypto, remoteIP: remoteIP}
+
+	s.mu.Lock()
+	isFirstInstance := len(s.nodes[nodeID]) == 0
+	s.nodes[nodeID] = append(s.nodes[nodeID], ns)
 	s.byConn[conn] = ns
+	instanceCount := len(s.nodes[nodeID])
 	s.mu.Unlock()
 
 	_ = s.repo.UpdateNodeOnline(nodeID, 1, version, httpVal, tlsVal, socksVal)
-	s.broadcastStatus(nodeID, 1)
+	s.broadcastStatusWithCount(nodeID, 1, instanceCount)
 
-	s.mu.RLock()
-	onlineHook := s.onNodeOnline
-	s.mu.RUnlock()
-	if onlineHook != nil {
-		go onlineHook(nodeID)
+	if isFirstInstance {
+		s.mu.RLock()
+		onlineHook := s.onNodeOnline
+		s.mu.RUnlock()
+		if onlineHook != nil {
+			go onlineHook(nodeID)
+		}
 	}
 
 	defer func() {
 		close(done)
-		needOfflineBroadcast := false
 		s.mu.Lock()
-		current, ok := s.nodes[nodeID]
-		if ok && current.conn.conn == conn {
+		// Remove this specific session from the slice.
+		sessions := s.nodes[nodeID]
+		for i, sess := range sessions {
+			if sess.conn.conn == conn {
+				s.nodes[nodeID] = append(sessions[:i], sessions[i+1:]...)
+				break
+			}
+		}
+		remaining := len(s.nodes[nodeID])
+		if remaining == 0 {
 			delete(s.nodes, nodeID)
-			needOfflineBroadcast = true
 		}
 		delete(s.byConn, conn)
 		s.mu.Unlock()
-		if needOfflineBroadcast {
+
+		if remaining == 0 {
+			// Last instance disconnected – node is now fully offline.
 			s.failPendingForNode(nodeID, "节点连接已断开")
 			_ = s.repo.UpdateNodeStatus(nodeID, 0)
-			s.broadcastStatus(nodeID, 0)
+			s.broadcastStatusWithCount(nodeID, 0, 0)
+		} else {
+			// Still have other instances online – notify frontend of updated count.
+			s.broadcastStatusWithCount(nodeID, 1, remaining)
 		}
 		_ = conn.Close()
 	}()
@@ -366,84 +391,137 @@ func (s *Server) SendCommand(nodeID int64, cmdType string, data interface{}, tim
 	}
 
 	s.mu.RLock()
-	ns, ok := s.nodes[nodeID]
+	sessions := s.nodes[nodeID]
 	s.mu.RUnlock()
-	if !ok || ns == nil || ns.conn == nil || ns.conn.conn == nil {
+	if len(sessions) == 0 {
 		return CommandResult{}, errors.New("节点不在线")
 	}
 
-	requestID := fmt.Sprintf("%d_%d", nodeID, time.Now().UnixNano())
-	ch := make(chan CommandResult, 1)
+	// Broadcast to all connected instances simultaneously.
+	// We collect the first successful response; errors from all instances are aggregated.
+	type instanceResult struct {
+		result CommandResult
+		err    error
+	}
+	resultCh := make(chan instanceResult, len(sessions))
 
-	s.mu.Lock()
-	s.pending[requestID] = pendingRequest{nodeID: nodeID, ch: ch}
-	s.mu.Unlock()
+	for _, ns := range sessions {
+		ns := ns // capture loop variable
+		if ns == nil || ns.conn == nil || ns.conn.conn == nil {
+			resultCh <- instanceResult{err: errors.New("instance conn nil")}
+			continue
+		}
 
-	cleanup := func() {
+		requestID := fmt.Sprintf("%d_%d_%p", nodeID, time.Now().UnixNano(), ns)
+		ch := make(chan CommandResult, 1)
+
 		s.mu.Lock()
-		if p, exists := s.pending[requestID]; exists {
-			delete(s.pending, requestID)
-			close(p.ch)
-		}
+		s.pending[requestID] = pendingRequest{nodeID: nodeID, ch: ch}
 		s.mu.Unlock()
-	}
 
-	cmdPayload := map[string]interface{}{
-		"type":      cmdType,
-		"data":      data,
-		"requestId": requestID,
-	}
-	rawCmd, err := json.Marshal(cmdPayload)
-	if err != nil {
-		cleanup()
-		return CommandResult{}, err
-	}
-
-	messageData := rawCmd
-	if ns.crypto != nil {
-		encrypted, err := ns.crypto.Encrypt(rawCmd)
+		cmdPayload := map[string]interface{}{
+			"type":      cmdType,
+			"data":      data,
+			"requestId": requestID,
+		}
+		rawCmd, err := json.Marshal(cmdPayload)
 		if err != nil {
-			cleanup()
-			return CommandResult{}, err
-		}
-		wrapper := map[string]interface{}{
-			"encrypted": true,
-			"data":      encrypted,
-			"timestamp": time.Now().UnixMilli(),
-		}
-		messageData, err = json.Marshal(wrapper)
-		if err != nil {
-			cleanup()
-			return CommandResult{}, err
-		}
-	}
-
-	ns.conn.mu.Lock()
-	_ = ns.conn.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
-	err = ns.conn.conn.WriteMessage(websocket.TextMessage, messageData)
-	_ = ns.conn.conn.SetWriteDeadline(time.Time{})
-	ns.conn.mu.Unlock()
-	if err != nil {
-		cleanup()
-		return CommandResult{}, err
-	}
-
-	select {
-	case result, ok := <-ch:
-		if !ok {
-			return CommandResult{}, errors.New("命令通道已关闭")
-		}
-		if !result.Success {
-			if strings.TrimSpace(result.Message) == "" {
-				result.Message = "命令执行失败"
+			s.mu.Lock()
+			if p, exists := s.pending[requestID]; exists {
+				delete(s.pending, requestID)
+				close(p.ch)
 			}
-			return result, errors.New(result.Message)
+			s.mu.Unlock()
+			resultCh <- instanceResult{err: err}
+			continue
 		}
-		return result, nil
-	case <-time.After(timeout):
-		cleanup()
-		return CommandResult{}, errors.New("等待节点响应超时")
+
+		messageData := rawCmd
+		if ns.crypto != nil {
+			encrypted, encErr := ns.crypto.Encrypt(rawCmd)
+			if encErr != nil {
+				s.mu.Lock()
+				if p, exists := s.pending[requestID]; exists {
+					delete(s.pending, requestID)
+					close(p.ch)
+				}
+				s.mu.Unlock()
+				resultCh <- instanceResult{err: encErr}
+				continue
+			}
+			wrapper := map[string]interface{}{
+				"encrypted": true,
+				"data":      encrypted,
+				"timestamp": time.Now().UnixMilli(),
+			}
+			messageData, err = json.Marshal(wrapper)
+			if err != nil {
+				s.mu.Lock()
+				if p, exists := s.pending[requestID]; exists {
+					delete(s.pending, requestID)
+					close(p.ch)
+				}
+				s.mu.Unlock()
+				resultCh <- instanceResult{err: err}
+				continue
+			}
+		}
+
+		ns.conn.mu.Lock()
+		_ = ns.conn.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+		writeErr := ns.conn.conn.WriteMessage(websocket.TextMessage, messageData)
+		_ = ns.conn.conn.SetWriteDeadline(time.Time{})
+		ns.conn.mu.Unlock()
+		if writeErr != nil {
+			s.mu.Lock()
+			if p, exists := s.pending[requestID]; exists {
+				delete(s.pending, requestID)
+				close(p.ch)
+			}
+			s.mu.Unlock()
+			resultCh <- instanceResult{err: writeErr}
+			continue
+		}
+
+		go func(reqID string, respCh <-chan CommandResult) {
+			select {
+			case result, ok := <-respCh:
+				if !ok {
+					resultCh <- instanceResult{err: errors.New("命令通道已关闭")}
+					return
+				}
+				if !result.Success && strings.TrimSpace(result.Message) == "" {
+					result.Message = "命令执行失败"
+				}
+				resultCh <- instanceResult{result: result, err: func() error {
+					if !result.Success {
+						return errors.New(result.Message)
+					}
+					return nil
+				}()}
+			case <-time.After(timeout):
+				s.mu.Lock()
+				if p, exists := s.pending[reqID]; exists {
+					delete(s.pending, reqID)
+					close(p.ch)
+				}
+				s.mu.Unlock()
+				resultCh <- instanceResult{err: errors.New("等待节点响应超时")}
+			}
+		}(requestID, ch)
 	}
+
+	// Collect results; return first success or last error if all fail.
+	total := len(sessions)
+	var lastErr error
+	for i := 0; i < total; i++ {
+		ir := <-resultCh
+		if ir.err == nil {
+			return ir.result, nil
+		}
+		lastErr = ir.err
+	}
+	return CommandResult{}, lastErr
 }
 
 func (s *Server) tryResolvePending(nodeID int64, message string) {
@@ -531,14 +609,19 @@ func (s *Server) failPendingForNode(nodeID int64, message string) {
 	}
 }
 
-func (s *Server) broadcastStatus(nodeID int64, status int) {
+func (s *Server) broadcastStatusWithCount(nodeID int64, status int, instanceCount int) {
 	payload := map[string]interface{}{
-		"id":   strconv.FormatInt(nodeID, 10),
-		"type": "status",
-		"data": status,
+		"id":            strconv.FormatInt(nodeID, 10),
+		"type":          "status",
+		"data":          status,
+		"instanceCount": instanceCount,
 	}
 	raw, _ := json.Marshal(payload)
 	s.broadcastToAdmins(string(raw))
+}
+
+func (s *Server) broadcastStatus(nodeID int64, status int) {
+	s.broadcastStatusWithCount(nodeID, status, 0)
 }
 
 func (s *Server) broadcastInfo(nodeID int64, data string) {
@@ -571,6 +654,37 @@ func (s *Server) broadcastToAdmins(message string) {
 			log.Printf("websocket broadcast failed: %v", err)
 		}
 	}
+}
+
+// GetNodeInstances returns info about all currently connected machine instances for a node.
+func (s *Server) GetNodeInstances(nodeID int64) []NodeInstanceInfo {
+	if s == nil {
+		return nil
+	}
+	s.mu.RLock()
+	sessions := s.nodes[nodeID]
+	result := make([]NodeInstanceInfo, 0, len(sessions))
+	for _, ns := range sessions {
+		result = append(result, NodeInstanceInfo{RemoteIP: ns.remoteIP})
+	}
+	s.mu.RUnlock()
+	return result
+}
+
+// GetNodeInstanceCount returns the number of currently connected machine instances for a node.
+func (s *Server) GetNodeInstanceCount(nodeID int64) int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	count := len(s.nodes[nodeID])
+	s.mu.RUnlock()
+	return count
+}
+
+// IsNodeOnline returns true if at least one instance of the node is connected.
+func (s *Server) IsNodeOnline(nodeID int64) bool {
+	return s.GetNodeInstanceCount(nodeID) > 0
 }
 
 func decryptIfNeeded(payload []byte, crypto *security.AESCrypto, secret string) string {

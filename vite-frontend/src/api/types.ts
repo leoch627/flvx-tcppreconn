@@ -8,7 +8,12 @@ export interface NodeApiItem {
   renewalCycle?: "month" | "quarter" | "year" | "";
   expiryReminderDismissed?: number;
   syncError?: string;
+  instanceCount?: number; // number of currently connected CDT machine instances
   [key: string]: unknown;
+}
+
+export interface NodeInstanceItem {
+  remoteIP: string;
 }
 
 export type RuntimeEngine = "gost" | "dash";
