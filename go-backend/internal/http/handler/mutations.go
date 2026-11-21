@@ -3117,18 +3117,6 @@ func federationRuntimeResourceKey(tunnelID int64, nodeID int64, chainType int, h
 	return fmt.Sprintf("tunnel:%d:node:%d:type:%d:hop:%d", tunnelID, nodeID, chainType, hopInx)
 }
 
-func remoteShareIDFromConfig(raw string) int64 {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0
-	}
-	var cfg map[string]interface{}
-	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
-		return 0
-	}
-	return asInt64(cfg["shareId"], 0)
-}
-
 func (h *Handler) federationLocalDomain() string {
 	cfg, _ := h.repo.GetConfigByName("panel_domain")
 	if cfg == nil {
