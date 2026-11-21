@@ -1,0 +1,10 @@
+/go-backend/paneld_linux
+/go-gost/flux_agent_linux
+/go-gost/flux_agent
+/go-backend/cmd/paneld/paneld
+/go-gost/gost
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+/test-results/
