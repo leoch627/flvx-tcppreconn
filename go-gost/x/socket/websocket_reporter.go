@@ -1584,43 +1584,6 @@ func updateLocalConfigJSON(httpVal int, tlsVal int, socksVal int) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// handleCall 处理服务端的call回调消息
-func (w *WebSocketReporter) handleCall(data interface{}) error {
-	// 解析call数据
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("序列化call数据失败: %v", err)
-	}
-
-	// 可以根据call的具体内容进行不同的处理
-	var callData map[string]interface{}
-	if err := json.Unmarshal(jsonData, &callData); err != nil {
-		return fmt.Errorf("解析call数据失败: %v", err)
-	}
-
-	fmt.Printf("🔔 收到服务端call回调: %v\n", callData)
-
-	// 根据call的类型执行不同的操作
-	if callType, exists := callData["type"]; exists {
-		switch callType {
-		case "ping":
-			fmt.Printf("📡 收到ping，发送pong回应\n")
-			// 可以在这里发送pong响应
-		case "info_request":
-			fmt.Printf("📊 服务端请求额外信息\n")
-			// 可以在这里发送额外的系统信息
-		case "command":
-			fmt.Printf("⚡ 服务端发送执行命令\n")
-			// 可以在这里执行特定命令
-		default:
-			fmt.Printf("❓ 未知的call类型: %v\n", callType)
-		}
-	}
-
-	// 简单返回成功，表示call已被处理
-	return nil
-}
-
 // sendResponse 发送响应消息到服务端
 func (w *WebSocketReporter) sendResponse(response CommandResponse) {
 	w.connMutex.Lock()
