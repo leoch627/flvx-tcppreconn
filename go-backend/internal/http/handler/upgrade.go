@@ -67,14 +67,6 @@ func releaseChannelFromTag(tag string) string {
 	return releaseChannelDev
 }
 
-func releaseChannelLabel(channel string) string {
-	if normalizeReleaseChannel(channel) == releaseChannelDev {
-		return "测试版"
-	}
-
-	return "正式版"
-}
-
 func (h *Handler) getGithubProxyConfig() (enabled bool, proxyURL string) {
 	enabled = defaultGithubProxyEnabled
 	proxyURL = defaultGithubProxyURL
@@ -96,16 +88,6 @@ func (h *Handler) getGithubProxyConfig() (enabled bool, proxyURL string) {
 	}
 
 	return
-}
-
-func (h *Handler) buildGithubDownloadURL(version, filename string) string {
-	enabled, proxyURL := h.getGithubProxyConfig()
-	base := fmt.Sprintf("%s/%s/releases/download/%s/%s", githubHTMLBase, githubRepo, version, filename)
-
-	if enabled {
-		return fmt.Sprintf("%s/%s", proxyURL, base)
-	}
-	return base
 }
 
 // buildRawMainURL builds a URL to download a file from the main branch
