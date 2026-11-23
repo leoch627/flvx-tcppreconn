@@ -1390,14 +1390,6 @@ func parseUserID(sub string) (int64, error) {
 	return id, nil
 }
 
-func userIDFromRequest(r *http.Request) (int64, error) {
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(auth.Claims)
-	if !ok {
-		return 0, strconv.ErrSyntax
-	}
-	return parseUserID(claims.Sub)
-}
-
 func userRoleFromRequest(r *http.Request) (int64, int, error) {
 	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(auth.Claims)
 	if !ok {
