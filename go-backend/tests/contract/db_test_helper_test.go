@@ -2,7 +2,6 @@ package contract_test
 
 import (
 	"database/sql"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -159,8 +158,4 @@ func valueAsBool(v interface{}) bool {
 	default:
 		return false
 	}
-}
-
-func jsonInt64(v int64) string {
-	return strconv.FormatInt(v, 10)
 }
