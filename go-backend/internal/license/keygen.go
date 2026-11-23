@@ -104,45 +104,6 @@ func (c *KeygenClient) ValidateKeyWithFingerprint(key string, fingerprint string
 	return &valResp, nil
 }
 
-func (c *KeygenClient) ValidateKey(key string) (*ValidateResponse, error) {
-	url := fmt.Sprintf("https://api.keygen.sh/v1/accounts/%s/licenses/actions/validate-key", c.AccountID)
-
-	reqBody := map[string]interface{}{
-		"meta": map[string]string{
-			"key": key,
-		},
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if c.Token != "" {
-		if !strings.HasPrefix(c.Token, "Bearer ") && !strings.HasPrefix(c.Token, "License ") {
-			req.Header.Set("Authorization", "License "+c.Token)
-		} else {
-			req.Header.Set("Authorization", c.Token)
-		}
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("keygen api error: status %d", resp.StatusCode)
-	}
-
-	var valResp ValidateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&valResp); err != nil {
-		return nil, err
-	}
-
-	return &valResp, nil
-}
-
 func (c *KeygenClient) ActivateMachine(licenseID, fingerprint string) error {
 	url := fmt.Sprintf("https://api.keygen.sh/v1/accounts/%s/machines", c.AccountID)
 
