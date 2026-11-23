@@ -53,22 +53,6 @@ func JWT(opts AuthOptions) func(http.Handler) http.Handler {
 	}
 }
 
-func RequireAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw := r.Context().Value(ClaimsContextKey)
-		claims, ok := raw.(auth.Claims)
-		if !ok {
-			response.WriteJSON(w, response.Err(401, "无法获取用户权限信息"))
-			return
-		}
-		if claims.RoleID != 0 {
-			response.WriteJSON(w, response.Err(403, "权限不足，仅管理员可操作"))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func shouldSkip(path string) bool {
 	switch {
 	case strings.HasPrefix(path, "/flow/"):
