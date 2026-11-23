@@ -3879,23 +3879,6 @@ func (h *Handler) deleteForwardByID(id int64) error {
 	return h.repo.DeleteForwardCascade(id)
 }
 
-func (h *Handler) batchForwardDelete(ids []int64) (int, int) {
-	s := 0
-	f := 0
-	for _, id := range ids {
-		if err := h.deleteForwardByID(id); err != nil {
-			f++
-		} else {
-			s++
-		}
-	}
-	return s, f
-}
-
-func (h *Handler) batchForwardStatus(ids []int64, status int) (int, int) {
-	return h.repo.BatchUpdateForwardStatus(ids, status)
-}
-
 func (h *Handler) tunnelEntryNodeIDs(tunnelID int64) ([]int64, error) {
 	return h.repo.TunnelEntryNodeIDs(tunnelID)
 }

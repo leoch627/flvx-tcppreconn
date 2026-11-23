@@ -673,10 +673,6 @@ func (h *Handler) sendNodeCommandWithTimeout(nodeID int64, commandType string, d
 	return result, err
 }
 
-func (h *Handler) sendRemoteNodeCommand(node *nodeRecord, commandType string, data interface{}) (ws.CommandResult, error) {
-	return h.sendRemoteNodeCommandWithTimeout(node, commandType, data, 0)
-}
-
 func (h *Handler) sendRemoteNodeCommandWithTimeout(node *nodeRecord, commandType string, data interface{}, timeout time.Duration) (ws.CommandResult, error) {
 	if node == nil {
 		return ws.CommandResult{}, errors.New("节点不存在")
