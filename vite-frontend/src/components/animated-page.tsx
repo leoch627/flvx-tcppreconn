@@ -95,26 +95,3 @@ export const StaggerItem = ({
     </Component>
   );
 };
-
-/**
- * Simple fade-in animation for standalone elements (chips, badges, counters, etc.)
- * Uses opacity + translateY to avoid font blurriness caused by scale transforms.
- */
-export const FadeIn = ({
-  children,
-  delay = 0,
-  className,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-}) => (
-  <motion.div
-    animate={{ opacity: 1, y: 0 }}
-    className={className}
-    initial={{ opacity: 0, y: 8 }}
-    transition={{ duration: 0.2, delay, ease: "easeOut" }}
-  >
-    {children}
-  </motion.div>
-);
