@@ -189,18 +189,3 @@ func (m *GlobalTrafficManager) Stop() {
 	}
 	fmt.Printf("🛑 全局流量管理器已停止\n")
 }
-
-// GetServiceTraffic 获取指定服务的当前流量（用于调试）
-func (m *GlobalTrafficManager) GetServiceTraffic(serviceName string) (upBytes, downBytes int64) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if traffic, exists := m.serviceTraffic[serviceName]; exists {
-		traffic.mu.Lock()
-		upBytes = traffic.UpBytes
-		downBytes = traffic.DownBytes
-		traffic.mu.Unlock()
-	}
-	return
-}
-

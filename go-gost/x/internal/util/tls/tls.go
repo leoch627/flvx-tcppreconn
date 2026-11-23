@@ -72,42 +72,6 @@ func generateDeviceID() string {
 	return hex.EncodeToString(hash.Sum(nil))[:16]
 }
 
-func generateDisguisedDomain(deviceID string) string {
-	domains := []string{
-		"com", "net", "org", "top", "cc", "info", "biz", "co", "me", "io",
-		"us", "cn", "uk", "de", "fr", "jp", "ru", "br", "au", "ca",
-	}
-	
-	prefixes := []string{
-		"api", "app", "web", "www", "cdn", "static", "assets", "media", "img", "imgcdn",
-		"secure", "ssl", "tls", "https", "gateway", "proxy", "service", "portal", "hub",
-		"cloud", "server", "node", "host", "site", "page", "view", "load", "cache",
-	}
-	
-	seed := deviceID[:8]
-	
-	seedInt := int64(0)
-	for _, char := range seed {
-		var val int64
-		if char >= '0' && char <= '9' {
-			val = int64(char - '0')
-		} else if char >= 'a' && char <= 'f' {
-			val = int64(char - 'a' + 10)
-		}
-		seedInt = seedInt*16 + val
-	}
-	
-	domainIndex := seedInt % int64(len(domains))
-	domain := domains[domainIndex]
-	
-	prefixIndex := (seedInt / int64(len(domains))) % int64(len(prefixes))
-	prefix := prefixes[prefixIndex]
-	
-	randomSuffix := fmt.Sprintf("%d", seedInt%9999+1000)
-	
-	return fmt.Sprintf("%s.%s.%s", prefix, randomSuffix, domain)
-}
-
 func generateDisguisedOrganization(deviceID string) string {
 	companyPrefixes := []string{
 		"Cloud", "Digital", "Secure", "Global", "Advanced", "Enterprise", "Professional",
