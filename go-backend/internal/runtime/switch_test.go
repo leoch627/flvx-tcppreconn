@@ -250,18 +250,6 @@ func (c *stubRuntimeClient) CheckService(context.Context, repo.Node, ServiceChec
 	return ServiceCheckResult{}, nil
 }
 
-func (c *stubRuntimeClient) waitForDone(t *testing.T) {
-	t.Helper()
-	if c.done == nil {
-		return
-	}
-	select {
-	case <-c.done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for async switch completion")
-	}
-}
-
 func waitForSwitchProgressState(t *testing.T, orchestrator *SwitchOrchestrator, want SwitchStatus) SwitchProgress {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
