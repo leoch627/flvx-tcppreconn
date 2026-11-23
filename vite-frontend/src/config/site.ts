@@ -9,7 +9,8 @@ const APP_VERSION = "1.0.3";
 const DEFAULT_FAVICON = "/favicon.ico";
 const FAVICON_LINK_ID = "app-favicon";
 const GITHUB_REPO =
-  import.meta.env.VITE_GITHUB_REPO || "https://github.com/Xeloan/flvx-tcppreconn";
+  import.meta.env.VITE_GITHUB_REPO ||
+  "https://github.com/Xeloan/flvx-tcppreconn";
 
 const getInitialConfig = () => {
   if (typeof window === "undefined") {
@@ -303,17 +304,6 @@ export const updateSiteConfig = async (configMap?: Record<string, string>) => {
     window.dispatchEvent(new Event("site-config-updated"));
   }
   updateDocumentFavicon(siteConfig.app_favicon);
-};
-
-// 清除配置缓存的工具函数（用于需要强制重拉配置的场景）
-export const clearConfigCache = (keys?: string[]) => {
-  if (keys && keys.length > 0) {
-    // 删除指定的配置缓存
-    keys.forEach((key) => configCache.remove(key));
-  } else {
-    // 清空所有配置缓存
-    configCache.clear();
-  }
 };
 
 // 在页面加载时异步更新配置（如果有更新的话）

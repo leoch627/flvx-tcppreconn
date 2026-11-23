@@ -5,13 +5,6 @@ export const SESSION_STORAGE_KEYS = {
   admin: "admin",
 } as const;
 
-export interface SessionData {
-  token: string | null;
-  roleId: number | null;
-  name: string | null;
-  isAdmin: boolean;
-}
-
 export interface LoginSessionPayload {
   token: string;
   role_id: number;
@@ -59,15 +52,6 @@ export const getAdminFlag = (): boolean => {
   return isAdmin;
 };
 
-export const readSession = (): SessionData => {
-  return {
-    token: getToken(),
-    roleId: getRoleId(),
-    name: getSessionName(),
-    isAdmin: getAdminFlag(),
-  };
-};
-
 export const writeLoginSession = (payload: LoginSessionPayload): void => {
   localStorage.setItem(SESSION_STORAGE_KEYS.token, payload.token);
   localStorage.setItem(SESSION_STORAGE_KEYS.roleId, String(payload.role_id));
@@ -86,5 +70,3 @@ export const clearSession = (): void => {
   localStorage.removeItem(SESSION_STORAGE_KEYS.admin);
   window.dispatchEvent(new Event(SESSION_EVENT_NAME));
 };
-
-export const SESSION_UPDATED_EVENT = SESSION_EVENT_NAME;

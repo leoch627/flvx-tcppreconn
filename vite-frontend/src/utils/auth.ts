@@ -37,17 +37,6 @@ export function isAdmin(): boolean {
 }
 
 /**
- * 判断当前用户是否有指定角色
- * @param targetRoleId 目标角色ID
- * @returns 是否有指定角色
- */
-export function hasRole(targetRoleId: number): boolean {
-  const roleId = getCurrentUserRoleId();
-
-  return roleId === targetRoleId;
-}
-
-/**
  * 判断当前用户是否已登录且token有效
  * @returns 是否已登录
  */
@@ -55,23 +44,4 @@ export function isLoggedIn(): boolean {
   const token = getToken();
 
   return token ? isTokenValid(token) : false;
-}
-
-/**
- * 权限检查装饰器函数
- * @param fn 要执行的函数
- * @param _errorMsg 权限不足时的错误提示
- * @returns 包装后的函数
- */
-export function requireAdmin<T extends (...args: any[]) => any>(
-  fn: T,
-  _errorMsg: string = "权限不足，仅管理员可操作",
-): T {
-  return ((...args: Parameters<T>) => {
-    if (!isAdmin()) {
-      return false;
-    }
-
-    return fn(...args);
-  }) as T;
 }

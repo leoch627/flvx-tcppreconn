@@ -29,14 +29,3 @@ export const PageEmptyState = ({
     </div>
   );
 };
-
-export const PageErrorState = ({
-  message,
-  className = "h-48",
-}: BaseStateProps) => {
-  return (
-    <div className={`flex items-center justify-center ${className}`}>
-      <span className="text-danger">{message}</span>
-    </div>
-  );
-};
