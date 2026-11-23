@@ -28,10 +28,7 @@
     "@radix-ui/react-switch": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
     "@react-aria/i18n": "^3.12.12",
-    "@react-aria/visually-hidden": "3.8.25",
-    "@react-types/shared": "3.30.0",
     "@tailwindcss/postcss": "4.1.11",
-    "@tailwindcss/vite": "^4.1.18",
     "axios": "^1.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "2.1.1",
@@ -46,7 +43,6 @@
     "recharts": "^3.1.1",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "sonner": "^2.0.6",
     "tailwind-merge": "^2.5.5",
     "tailwind-variants": "1.0.0",
     "tailwindcss": "4.1.11",
@@ -66,7 +62,6 @@
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
-    "eslint-plugin-node": "11.1.0",
     "eslint-plugin-prettier": "5.2.1",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "5.2.0",
@@ -76,8 +71,7 @@
     "prettier": "3.5.3",
     "typescript": "5.6.3",
     "vite": "npm:rolldown-vite@^7.3.1",
-    "vite-plugin-pwa": "^1.1.0",
-    "vite-tsconfig-paths": "^6.0.5"
+    "vite-plugin-pwa": "^1.1.0"
   },
   "overrides": {
     "serialize-javascript": "^7.0.5"
