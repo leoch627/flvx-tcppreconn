@@ -95,11 +95,6 @@ export const updateNodeOrder = (data: {
 }) => Network.post("/node/update-order", data);
 export const dismissNodeExpiryReminder = (id: number) =>
   Network.post("/node/dismiss-expiry-reminder", { id });
-export const checkNodeStatus = (nodeId?: number) => {
-  const params = nodeId ? { nodeId } : {};
-
-  return Network.post("/node/check-status", params);
-};
 
 export const upgradeNode = (
   id: number,
@@ -131,12 +126,8 @@ export const createTunnel = (data: TunnelMutationPayload) =>
   Network.post("/tunnel/create", data);
 export const getTunnelList = () =>
   Network.post<TunnelApiItem[]>("/tunnel/list");
-export const getTunnelById = (id: number) =>
-  Network.post<TunnelApiItem>("/tunnel/get", { id });
 export const updateTunnel = (data: TunnelMutationPayload) =>
   Network.post("/tunnel/update", data, { timeout: 120_000 });
-export const deleteTunnel = (id: number) =>
-  Network.post("/tunnel/delete", { id });
 export const previewTunnelDelete = (id: number) =>
   Network.post<TunnelDeletePreviewApiData>("/tunnel/delete-preview", { id });
 export const deleteTunnelWithForwards = (data: {
@@ -175,8 +166,6 @@ export const updateTunnelOrder = (data: {
 }) => Network.post("/tunnel/update-order", data);
 
 // 用户隧道权限管理操作 - 全部使用POST请求
-export const assignUserTunnel = (data: UserTunnelAssignPayload) =>
-  Network.post("/tunnel/user/assign", data);
 export const batchAssignUserTunnel = (data: {
   userId: number;
   tunnels: Array<{ tunnelId: number; speedId?: number | null }>;
@@ -257,17 +246,8 @@ export const updateConfig = (name: string, value: string) =>
 export const activateLicense = (licenseKey: string) =>
   Network.post("/license/activate", { license_key: licenseKey });
 
-export const exportBackupData = () => Network.post("/backup/export");
-export const importBackupData = (data: BackupImportPayload) =>
-  Network.post("/backup/import", data);
-export const restoreBackupData = (data: BackupImportPayload) =>
-  Network.post("/backup/restore", data);
-
 // 验证码相关接口
 export const checkCaptcha = () => Network.post("/captcha/check");
-export const generateCaptcha = () => Network.post(`/captcha/generate`);
-export const verifyCaptcha = (data: { captchaId: string; trackData: string }) =>
-  Network.post("/captcha/verify", data);
 
 // 批量操作接口
 export const batchDeleteForwards = (ids: number[]) =>
@@ -276,8 +256,6 @@ export const batchPauseForwards = (ids: number[]) =>
   Network.post<BatchOperationResult>("/forward/batch-pause", { ids });
 export const batchResumeForwards = (ids: number[]) =>
   Network.post<BatchOperationResult>("/forward/batch-resume", { ids });
-export const batchDeleteTunnels = (ids: number[]) =>
-  Network.post<BatchOperationResult>("/tunnel/batch-delete", { ids });
 export const batchDeleteNodes = (ids: number[]) =>
   Network.post<BatchOperationResult>("/node/batch-delete", { ids });
 export const batchRedeployForwards = (ids: number[]) =>
@@ -437,9 +415,6 @@ export const getNodeMetrics = (
     { timeout: 60_000 },
   );
 };
-
-export const getNodeMetricsLatest = (nodeId: number) =>
-  Network.get<NodeMetricApiItem>(`/monitor/nodes/${nodeId}/metrics/latest`);
 
 export const getTunnelMetrics = (
   tunnelId: number,
